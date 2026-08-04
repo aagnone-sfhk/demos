@@ -1,0 +1,10 @@
+[
+  {
+    "slug": "headless-360-mcp",
+    "title": "Headless 360 MCP Server",
+    "blurb": "Why 4 stable tools scale better than exposing thousands of API schemas up front. A visual walkthrough of Salesforce's Headless 360 MCP Server.",
+    "url": null,
+    "source": "https://github.com/aagnone/demos/tree/main/apps/headless-360-mcp",
+    "tags": ["mcp", "agents"]
+  }
+]
