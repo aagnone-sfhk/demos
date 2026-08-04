@@ -13,6 +13,10 @@
 <script src="./vendor/react.production.min.js"></script>
 <script src="./vendor/react-dom.production.min.js"></script>
 <script src="./vendor/babel.min.js"></script>
+<!-- Editable text for the diagram. Populates window.SCENARIO_COPY, .GLOSSARY,
+     .helpHTML — consumed by the app below. Edit this file to change any copy
+     without touching the HTML/JSX. -->
+<script src="./scenarios.copy.js"></script>
 <style>
   /* ---------- DESIGN TOKENS ----------
      Every color the diagram uses is a variable here. Retheme the whole
@@ -101,6 +105,12 @@
   .edge.ret { stroke-dasharray: 3 5; }
   .edge.ret.active { stroke: var(--good); }
   @keyframes flow { to { stroke-dashoffset: 14; } }
+  /* Spotlight — a narrow translucent wedge from a tool to the corpus card
+     it is currently scanning. The polygon's `points` are animated via SMIL
+     to sweep through every corpus card in turn (see the render code); this
+     reads as "reading each item, one at a time" rather than "loading them
+     all at once". No CSS animation here on purpose — the SMIL sweep is
+     already the motion. */
   /* Plain edge label rendered as an opaque pill (see edge-label-pill JSX) so
      it stays legible near a card; --canvas backing + halo hide any close call. */
   .edge-label-pill { font-size: 10px; color: var(--slate); font-weight: 700; letter-spacing: .3px;
@@ -283,30 +293,12 @@ function Logo({ name, size = 26 }) {
   return <svg width={size} height={size} viewBox={l.vb} aria-label={name} role="img">{l.glyph}</svg>;
 }
 
-/* =====================================================================
-   GLOSSARY — inline jargon tooltips (optional but great for wide audiences).
-   Any term here can be surfaced as a help chip:
-     - in prose (headline / narration / hood): splice `${helpHTML("key")}`
-     - in JSX (a node label): set `helpTerm: "key"` on the node
-   Delete entries you don't need; the chip system no-ops on unknown keys.
-   ===================================================================== */
-const GLOSSARY = {
-  mcp: { term: "MCP", short: "Model Context Protocol — the standard that lets an AI agent call external tools via a typed request/response contract." },
-  toolslist: { term: "tools/list", short: "The MCP primitive that returns every tool schema the server exposes. Classic servers call it once at connect-time; the full schema payload is loaded into the agent's context window." },
-  ctx: { term: "context window", short: "The fixed-size memory an LLM can reason over in one turn. Every tool schema loaded upfront consumes that space — leaving less room for actual work." },
-  discover: { term: "Discover", short: "Semantic search over the indexed Salesforce API corpus. Returns ranked matches (name + description) without loading full schemas — keeps the context window lean." },
-  describe: { term: "Describe", short: "Fetches the full OAS spec for one action by ID. Only called after Discover identifies the right action — so only the needed spec hits the context window." },
-  dispatch: { term: "Dispatch", short: "Invokes a Salesforce API by passing the HTTP method + path verbatim from a Discover/Describe result. The agent never holds the full schema corpus — just the one path it needs." },
-};
-
-// Chips are inert triggers — no popup nested inside them (the foreignObject
-// trap). data-help-term is read by one document-level listener that drives
-// the single shared <HelpOverlay/>.
-function helpHTML(id) {
-  const g = GLOSSARY[id];
-  if (!g) return id;
-  return `<span class="help-chip" tabindex="0" data-help-term="${id}">${g.term}<span class="qm">?</span></span>`;
-}
+/* GLOSSARY + helpHTML() are defined in scenarios.copy.js (loaded before this
+   script). They're globals on window so any copy string can splice a chip:
+     - in prose:      `${helpHTML("key")}`     (a chip's HTML)
+     - on a node:     helpTerm: "key"          (a chip next to the label)
+   Chips are inert triggers only; the shared <HelpOverlay/> below owns the
+   popup so it can't get trapped inside an SVG foreignObject. */
 function Help({ id }) {
   const g = GLOSSARY[id];
   if (!g) return null;
@@ -369,89 +361,74 @@ const EDGE_LABEL = { query: "Query", a2a: "Call", mcp: "Tool", api: "API", event
 const EDGE_LABEL_TERM = { api: "api" }; // e.g. the "API" label becomes a "?" chip
 
 /* =====================================================================
-   SCENARIO DATA — THIS IS THE PART YOU EDIT.
+   SCENARIO LAYOUT — the STRUCTURAL bits only.
    ---------------------------------------------------------------------
-   Coordinate system: an SVG viewBox of CW x CH. A node's (x, y) is its
-   TOP-LEFT corner; every node card is NW x NH. So the usable field for
-   top-left corners is x ∈ [0, CW-NW], y ∈ [0, CH-NH]. Lay nodes out on a
-   loose grid — columns by pipeline stage (left→right), rows to separate
-   parallel branches. Leave ~NPAD of breathing room; boxes can overlap
-   visually a little because active ones lift via shadow.
+   All prose (title, eyebrow, headline, node labels/subtitles, step
+   narration/hood, sub-overrides per step) lives in scenarios.copy.js.
+   Merge happens at the bottom of this block.
 
-   Each SCENARIO is one diagram (the side rail switches between them):
-     id       unique string
-     nav      side-rail label
-     eyebrow  small caps kicker above the title
-     title    <h1>
-     headline intro prose (supports ${helpHTML("key")} chips & HTML)
-     nodes[]  { id, label, sub?, type, logo?, x, y, helpTerm?, finalLogo? }
+   Coordinate system: an SVG viewBox of CW x CH. A node's (x, y) is its
+   TOP-LEFT corner; every node card is NW x NH. Usable field for top-left
+   corners is x ∈ [0, CW-NW], y ∈ [0, CH-NH]. Loose grid — columns by
+   pipeline stage (left→right), rows to separate parallel branches.
+
+   Each SCENARIO_LAYOUT entry:
+     id       unique string (matches SCENARIO_COPY key)
+     lanes    optional swim-lane backgrounds
+     nodes[]  { id, type, logo?, x, y, w?, h?, helpTerm?, ctxFill?, finalLogo? }
      edges[]  { from, to, kind, label?, skipHelp?, pokeballRide? }
-              from/to are node ids. kind drives styling + arrowhead + label.
-              kind "ret" = a return edge: it routes along a baseline lane and
-              is drawn dashed/green. Give exactly one closing "ret" edge if
-              the flow returns an answer to the requester.
-     steps[]  the walkthrough. Each step lights a subset of the graph:
+              kind "ret" = a return edge (dashed/green, baseline lane).
+     steps[]  the walkthrough:
               { activeNodes:[ids], activeEdges:["from-to", ...],
-                narration: "what happens (HTML ok)", hood: "deeper why (HTML ok)" }
-              An edge id is literally `${from}-${to}`. Nodes NOT in
-              activeNodes dim; edges in activeEdges animate.
+                nodeOverrides?: { <id>: { ctxFill?, ... } } }
+              An edge id is literally `${from}-${to}`.
      security optional callout string shown under every step (HTML ok).
 
-   The rider (`pokeballRide: true` on an edge) puts a small logo that travels
-   the path via SVG <animateMotion> whenever that edge is active — a nice
-   flourish for a final "answer delivered" hop. Point RIDER_LOGO at any
-   LOGOS key. Omit it entirely if you don't want a rider.
+   The rider (`pokeballRide: true`) puts a small logo that travels the
+   path via SVG <animateMotion> when that edge is active. RIDER_LOGO is
+   any LOGOS key. Omit if you don't want a rider.
    ===================================================================== */
 const NW = 164, NH = 64, CW = 1400, CH = 830, RET_Y = 815, NPAD = 24;
 const CORPUS_X = 992;   // x where the neutral corpus panel begins; lanes stop here
 const RIDER_LOGO = "sfcloud";
 
 // ── Layout ─────────────────────────────────────────────────────────────────
-// Single agent forks up to Standard MCP (classic) and down to headless-360.
-// Corpus column (x=820, y=40-310): the same 2,000+ actions — both servers reach it.
 // Classic path: agent → c-server → corpus (all) → c-ctx (floods)
 // Headless path: agent → h-server → 4 tools → corpus (selective) → h-ctx (lean)
 
-const SCENARIOS = [
+const SCENARIO_LAYOUT = [
   {
     id: "comparison",
-    nav: "Classic vs. Headless 360 MCP",
-    eyebrow: "Salesforce MCP Context Efficiency",
-    title: "Standard MCP vs. Headless 360 MCP",
-    headline: `Both routes front the <b>2,000+ Salesforce actions</b> over ${helpHTML("mcp")}. A standard server dumps every schema into the ${helpHTML("ctx")} at startup. The four ${helpHTML("discover")} / ${helpHTML("describe")} / ${helpHTML("dispatch")} tools act as an intermediary — keeping context lean by fetching only what's needed, on demand.`,
     // Two swim-lane backgrounds + divider. y split: midpoint between corpus
     // bottom (374) and headless label top (490) = 432.
     lanes: [
       { y1: 0,   y2: 410, fill: "rgba(194,65,12,.055)",  color: "rgba(194,65,12,.55)",  label: "STANDARD MCP" },
-      { y1: 410, y2: 830, fill: "rgba(10,138,111,.065)", color: "rgba(10,138,111,.55)", label: "HEADLESS 360" },
+      { y1: 410, y2: 830, fill: "rgba(10,138,111,.065)", color: "rgba(10,138,111,.55)", label: "HEADLESS 360 MCP" },
     ],
     nodes: [
-      // ── Classic lane agent ────────────────────────────────────────────────
-      { id: "c-agent", label: "AI Agent", sub: "Usage: heavy", type: "agent", x: 106, y: 155, w: 204, h: 104, ctxFill: 0 },
+      // ── Classic lane ──────────────────────────────────────────────────────
+      { id: "c-agent",       type: "agent",    x: 106,  y: 155, w: 204, h: 104, ctxFill: 0 },
+      { id: "c-server",      type: "mcp",      logo: "toolstack", x: 360,  y: 80  },
 
-      // ── Classic server + corpus ───────────────────────────────────────────
-      { id: "c-server", label: "Standard MCP",       sub: "Returns entire catalog",     type: "mcp",      logo: "toolstack", x: 360, y: 80  },
-      // Corpus — neutral panel spanning full canvas height, shared by both lanes.
+      // ── Shared corpus (Salesforce Resources column) ───────────────────────
       // 9 cards × 72px step = 648; start y=(830-648)/2=91, step=72.
-      { id: "corp-1", label: "getAccount",          sub: "Sales",                type: "resource",               x: 1088, y: 91  },
-      { id: "corp-2", label: "queryDataCloud",      sub: "Data 360",             type: "resource",               x: 1088, y: 163 },
-      { id: "corp-3", label: "getQuoteLines",       sub: "Revenue",              type: "resource",               x: 1088, y: 235 },
-      { id: "corp-4", label: "createCase",          sub: "Service",              type: "resource",               x: 1088, y: 307 },
-      { id: "corp-5", label: "sendCampaignEmail",   sub: "Marketing",            type: "resource",               x: 1088, y: 379 },
-      { id: "corp-6", label: "getContactSegment",   sub: "Data 360",             type: "resource",               x: 1088, y: 451 },
-      { id: "corp-7", label: "createOpportunity",   sub: "Sales",                type: "resource",               x: 1088, y: 523 },
-      { id: "corp-8", label: "resolveCase",         sub: "Service",              type: "resource",               x: 1088, y: 595 },
-      { id: "corp-x", label: "+ 2,000 more",        sub: "indexed · searchable", type: "resource", logo: "database", x: 1088, y: 667 },
+      { id: "corp-1",        type: "resource",                                  x: 1088, y: 91  },
+      { id: "corp-2",        type: "resource",                                  x: 1088, y: 163 },
+      { id: "corp-3",        type: "resource",                                  x: 1088, y: 235 },
+      { id: "corp-4",        type: "resource",                                  x: 1088, y: 307 },
+      { id: "corp-5",        type: "resource",                                  x: 1088, y: 379 },
+      { id: "corp-6",        type: "resource",                                  x: 1088, y: 451 },
+      { id: "corp-7",        type: "resource",                                  x: 1088, y: 523 },
+      { id: "corp-8",        type: "resource",                                  x: 1088, y: 595 },
+      { id: "corp-x",        type: "resource", logo: "database",                x: 1088, y: 667 },
 
-      // ── Headless lane agent ───────────────────────────────────────────────
-      { id: "h-agent", label: "AI Agent", sub: "Usage: light", type: "agent", x: 106, y: 570, w: 204, h: 104, ctxFill: 0 },
-
-      // ── Headless server + 4 tools ─────────────────────────────────────────
-      { id: "h-server",      label: "Headless 360",        sub: "Exactly 4 tools",      type: "mcp",     logo: "sfcloud", x: 360, y: 530 },
-      { id: "h-discover",   label: "Discover",            sub: "Semantic search",      type: "resource", logo: "search",  x: 580, y: 460, helpTerm: "discover" },
-      { id: "h-describe",   label: "Describe",            sub: "Fetch one OAS spec",   type: "resource",                  x: 580, y: 544, helpTerm: "describe" },
-      { id: "h-dispatch",   label: "Dispatch",            sub: "Invoke the API",       type: "resource",                  x: 580, y: 628, helpTerm: "dispatch" },
-      { id: "h-dispatch-ro",label: "Dispatch Read-Only",  sub: "Read-only HTTP GET",   type: "resource",                  x: 580, y: 712, helpTerm: "dispatch" },
+      // ── Headless lane ─────────────────────────────────────────────────────
+      { id: "h-agent",       type: "agent",    x: 106,  y: 570, w: 204, h: 104, ctxFill: 0 },
+      { id: "h-server",      type: "mcp",      logo: "sfcloud",                 x: 360,  y: 530 },
+      { id: "h-discover",    type: "resource", logo: "search",  helpTerm: "discover", x: 580, y: 460 },
+      { id: "h-describe",    type: "resource",                  helpTerm: "describe", x: 580, y: 544 },
+      { id: "h-dispatch",    type: "resource",                  helpTerm: "dispatch", x: 580, y: 628 },
+      { id: "h-dispatch-ro", type: "resource",                  helpTerm: "dispatch", x: 580, y: 712 },
     ],
     edges: [
       // ── Classic ───────────────────────────────────────────────────────────
@@ -472,68 +449,96 @@ const SCENARIOS = [
       { from: "h-server",     to: "h-describe",    kind: "sync",  label: "" },
       { from: "h-server",     to: "h-dispatch",    kind: "sync",  label: "" },
       { from: "h-server",     to: "h-dispatch-ro", kind: "sync",  label: "" },
-      { from: "h-discover",   to: "corp-x",        kind: "query", label: "" },
+      // Tool → corpus edges. hideWhenInactive: only drawn on the step that
+      // activates them, so the diagram stays clean until a call is happening.
+      // spotlight: render a translucent searchlight cone across the corpus
+      // instead of a line — signals "search purview" without implying that
+      // every schema is being loaded into Discover.
+      { from: "h-discover",   to: "corp-x",        kind: "query", label: "", hideWhenInactive: true, spotlight: true },
+      { from: "h-describe",   to: "corp-4",        kind: "query", label: "", hideWhenInactive: true },
+      { from: "h-dispatch",   to: "corp-4",        kind: "query", label: "", hideWhenInactive: true },
     ],
     steps: [
-      // Step 1 — intro
+      // 1 — intro
       {
         activeNodes: ["c-agent","h-agent","corp-1","corp-2","corp-3","corp-4","corp-5","corp-6","corp-7","corp-8","corp-x"],
         activeEdges: [],
         nodeOverrides: { "c-agent": { ctxFill: 0 }, "h-agent": { ctxFill: 0 } },
-        narration: "Two agents, one goal: access Salesforce data. The <b>same 2,000+ actions</b> sit in the corpus on the right. Watch what happens to each agent's context window.",
-        hood: "The corpus is identical either way. The only difference is the interface in front of it — and how much gets loaded into the agent's context window before any work begins.",
       },
-      // Step 2 — Standard MCP connects
-      {
-        activeNodes: ["c-agent","c-server"],
-        activeEdges: ["c-agent-c-server"],
-        nodeOverrides: { "c-agent": { ctxFill: 0 } },
-        narration: `The top agent connects to a <b>Standard MCP server</b>. The protocol requires it to return every tool's full schema upfront — all 2,000+ of them.`,
-        hood: "MCP's tools/list call is a full dump: every schema, every parameter definition, every description. There's no partial or lazy loading. The server has no choice but to send everything it knows.",
-      },
-      // Step 3 — Standard MCP floods context
+      // 2 — Standard MCP connects and floods context
       {
         activeNodes: ["c-agent","c-server","corp-1","corp-2","corp-3","corp-4","corp-5","corp-6","corp-7","corp-8","corp-x"],
         activeEdges: ["c-agent-c-server","c-server-corp-1","c-server-corp-2","c-server-corp-3","c-server-corp-4","c-server-corp-5","c-server-corp-6","c-server-corp-7","c-server-corp-8","c-server-corp-x"],
-        nodeOverrides: { "c-agent": { ctxFill: 0.95, sub: "Usage: heavy" } },
-        narration: `All 2,000+ schemas load into the agent's ${helpHTML("ctx")} at once — before it has reasoned about a single task. The context window floods full.`,
-        hood: "A flooded context window is actively harmful. The model must attend to thousands of irrelevant parameter definitions while trying to plan. Schema noise is a leading cause of hallucination and degraded accuracy on large MCP servers.",
+        nodeOverrides: { "c-agent": { ctxFill: 0.95 } },
       },
-      // Step 4 — Headless 360 connects, gets 4 tools
+      // 3 — Headless 360 connects, gets 4 tools
       {
         activeNodes: ["h-agent","h-server","h-discover","h-describe","h-dispatch","h-dispatch-ro"],
         activeEdges: ["h-agent-h-server","h-server-h-discover","h-server-h-describe","h-server-h-dispatch","h-server-h-dispatch-ro"],
         nodeOverrides: { "h-agent": { ctxFill: 0 } },
-        narration: `The bottom agent connects to <b>Headless 360</b> and receives just <b>4 tools</b>. The full corpus is still there — it just hasn't been loaded yet.`,
-        hood: "Headless 360 decouples the interface (4 fixed tools) from the corpus (2,000+ actions behind them). The agent's context window stays empty until it asks for something specific.",
       },
-      // Step 5 — Discover queries selectively
+      // 4 — Discover queries selectively (corpus nodes lit to show scope;
+      // the h-discover→corp-x edge is a spotlight cone, not a line)
       {
-        activeNodes: ["h-agent","h-server","h-discover","corp-x"],
+        activeNodes: ["h-agent","h-server","h-discover","corp-1","corp-2","corp-3","corp-4","corp-5","corp-6","corp-7","corp-8","corp-x"],
         activeEdges: ["h-agent-h-server","h-server-h-discover","h-discover-corp-x"],
         nodeOverrides: { "h-agent": { ctxFill: 0.05 } },
-        narration: `${helpHTML("discover")} queries the corpus with natural language — returning only a ranked shortlist. No full schemas. The context window barely moves.`,
-        hood: "Tool RAG: the 2,000+ action corpus is indexed by embedding. The agent's query matches against action descriptions; only top hits return as compact text. The agent learns what exists without loading a single full schema.",
       },
-      // Step 6 — Describe + Dispatch
+      // 5 — Describe fetches the OAS spec for createCase
       {
-        activeNodes: ["h-agent","h-server","h-describe","h-dispatch","h-dispatch-ro"],
-        activeEdges: ["h-agent-h-server","h-server-h-describe","h-server-h-dispatch","h-server-h-dispatch-ro"],
-        nodeOverrides: { "h-agent": { ctxFill: 0.12, sub: "Usage: light" } },
-        narration: `${helpHTML("describe")} fetches <b>one action's OAS spec</b>. ${helpHTML("dispatch")} invokes it. Only that one spec entered the ${helpHTML("ctx")} — the rest of the corpus never touched it.`,
-        hood: "Describe fetches the full OpenAPI spec for one operation — enough to construct the call. Dispatch executes it, passing method and path verbatim. Context cost: one spec, not 2,000+.",
+        activeNodes: ["h-agent","h-server","h-describe","corp-4"],
+        activeEdges: ["h-agent-h-server","h-server-h-describe","h-describe-corp-4"],
+        nodeOverrides: { "h-agent": { ctxFill: 0.10 } },
       },
-      // Step 7 — the verdict
+      // 6 — Dispatch invokes createCase
+      {
+        activeNodes: ["h-agent","h-server","h-dispatch","corp-4"],
+        activeEdges: ["h-agent-h-server","h-server-h-dispatch","h-dispatch-corp-4"],
+        nodeOverrides: { "h-agent": { ctxFill: 0.12 } },
+      },
+      // 7 — the verdict
       {
         activeNodes: ["c-agent","c-server","h-agent","h-server","h-discover","h-describe","h-dispatch","h-dispatch-ro","corp-1","corp-2","corp-3","corp-4","corp-5","corp-6","corp-7","corp-8","corp-x"],
         activeEdges: ["c-agent-c-server","c-server-corp-1","c-server-corp-2","c-server-corp-3","c-server-corp-4","c-server-corp-5","c-server-corp-6","c-server-corp-7","c-server-corp-8","c-server-corp-x","h-agent-h-server","h-server-h-discover","h-server-h-describe","h-server-h-dispatch","h-server-h-dispatch-ro","h-discover-corp-x"],
-        nodeOverrides: { "c-agent": { ctxFill: 0.95, sub: "Usage: heavy" }, "h-agent": { ctxFill: 0.12, sub: "Usage: light" } },
-        narration: `Before either agent has done a single thing — Standard MCP has already consumed nearly the entire context window just loading tool definitions. <b>Headless 360 starts at near zero.</b> Same 2,000+ actions. One approach scales.`,
-        hood: "Context window capacity consumed by tool schemas is capacity unavailable for reasoning, memory, and output. At 2,000+ tools, Standard MCP doesn't leave room to think. Headless 360 loads only what's asked for — one spec at a time — so the agent's working memory stays available for actual work.",
+        nodeOverrides: { "c-agent": { ctxFill: 0.95 }, "h-agent": { ctxFill: 0.12 } },
       },
     ],
   },
 ];
+
+/* Merge editable copy (scenarios.copy.js → window.SCENARIO_COPY) into the
+   structural layout above. This is what the app renders. If the copy file
+   didn't load or a key is missing, we fall back to the id so the diagram
+   still renders (labels just look terse).
+   Per-node copy: { label, sub }
+   Per-step copy: { narration, hood, nodeOverrides: { <id>: { sub } } } */
+const _COPY = (typeof window !== "undefined" && window.SCENARIO_COPY) || {};
+function _mergeOverrides(base, extra) {
+  if (!base && !extra) return undefined;
+  const out = { ...(base || {}) };
+  for (const k of Object.keys(extra || {})) out[k] = { ...(out[k] || {}), ...extra[k] };
+  return Object.keys(out).length ? out : undefined;
+}
+const SCENARIOS = SCENARIO_LAYOUT.map(s => {
+  const c = _COPY[s.id] || {};
+  return {
+    ...s,
+    nav:      c.nav      ?? s.id,
+    eyebrow:  c.eyebrow  ?? "",
+    title:    c.title    ?? s.id,
+    headline: c.headline ?? "",
+    nodes: s.nodes.map(n => ({ ...n, ...((c.nodes && c.nodes[n.id]) || {}) })),
+    steps: s.steps.map((st, i) => {
+      const sc = (c.steps && c.steps[i]) || {};
+      return {
+        ...st,
+        narration: sc.narration ?? "",
+        hood:      sc.hood      ?? "",
+        nodeOverrides: _mergeOverrides(st.nodeOverrides, sc.nodeOverrides),
+      };
+    }),
+  };
+});
 
 /* =====================================================================
    GRAPH ENGINE — you rarely need to touch anything below this line.
@@ -681,6 +686,9 @@ function lintScenario(scenario) {
         issues.push(`nodes "${a.id}" and "${b.id}" overlap — spread them apart`);
     }
   for (const e of scenario.edges) {
+    // Spotlight edges aren't rendered as paths — they're a translucent wedge
+    // over the corpus column. Overlap checks don't apply.
+    if (e.spotlight) continue;
     const g = edgeGeo(byId, e);
     // 2. Edge path crossing a box that is neither endpoint.
     for (const n of scenario.nodes) {
@@ -803,11 +811,59 @@ function GraphCanvas({ scenario, step }) {
             </foreignObject>
           </g>);
         })()}
-        <defs />
+        <defs>
+          {/* Spotlight cone gradient — brightest near the source, dissipating
+              as it reaches the far edge of the corpus column. Reads as a
+              searchlight/flashlight beam: "these resources are in scope for
+              semantic search", NOT "all this data flows into the tool". */}
+          <linearGradient id="spotlight-grad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0"   stopColor="#0a8a6f" stopOpacity="0.06" />
+            <stop offset="0.6" stopColor="#0a8a6f" stopOpacity="0.20" />
+            <stop offset="1"   stopColor="#0a8a6f" stopOpacity="0.34" />
+          </linearGradient>
+        </defs>
+        {/* SPOTLIGHTS — draw before edges/nodes so they sit under everything.
+            A spotlight edge doesn't render as a line; instead a NARROW beam
+            fans from the source and SWEEPS through the corpus one card at a
+            time (SMIL animate on the polygon's points). This reads as
+            "scanning / reading each item" rather than "ingesting them all",
+            which is the whole point of Discover vs. tools/list. */}
+        {edgeInfo.filter(({ e, on }) => e.spotlight && on).map(({ e, i }) => {
+          const src = byId[e.from];
+          const sx = src.x + nw(src);            // right edge of source card
+          const sy = src.y + nh(src) / 2;        // vertical middle of card
+          // Every card in the corpus column is a scan target. Ping-pong the
+          // beam through them (0→N-1→0) so the sweep reverses at each end
+          // and feels like an active back-and-forth scan rather than a
+          // conveyor belt.
+          const targets = scenario.nodes.filter(n => n.x >= CORPUS_X - 10);
+          const pad = 6;
+          const frameFor = t => {
+            const tx = t.x - pad;
+            const t1 = t.y - pad, t2 = t.y + nh(t) + pad;
+            // 4-point wedge: narrow at Discover → card-height at the target
+            return `${sx},${sy - 5} ${sx},${sy + 5} ${tx},${t2} ${tx},${t1}`;
+          };
+          const sweep = [...targets, ...[...targets].reverse().slice(1, -1)];
+          const values = sweep.map(frameFor).join(";") + ";" + frameFor(sweep[0]);
+          const dur = (targets.length * 0.6) + "s";
+          return (
+            <g key={"sp" + i} className="spotlight" style={{ pointerEvents: "none" }}>
+              <polygon points={frameFor(targets[0])} fill="url(#spotlight-grad)">
+                <animate attributeName="points" values={values} dur={dur} repeatCount="indefinite" calcMode="linear" />
+              </polygon>
+            </g>
+          );
+        })}
         {/* edge paths (under nodes) */}
-        {edgeInfo.map(({ i, ret, g, mk, on }) => (
-          <path key={i} className={"edge" + (ret ? " ret" : "") + (on ? " active flow" : "")} d={g.d} />
-        ))}
+        {edgeInfo.map(({ e, i, ret, g, mk, on }) => {
+          // An edge tagged hideWhenInactive is only drawn on the step that
+          // activates it — keeps the diagram uncluttered until it's relevant.
+          if (e.hideWhenInactive && !on) return null;
+          // A spotlight edge is drawn as a wedge above, not a line.
+          if (e.spotlight) return null;
+          return <path key={i} className={"edge" + (ret ? " ret" : "") + (on ? " active flow" : "")} d={g.d} />;
+        })}
         {/* rider — a small logo that travels the path while its edge is active */}
         {edgeInfo.filter(({ e, on }) => e.pokeballRide && on).map(({ i, g }) => (
           <g key={"pb" + i} className="rider" transform="translate(-9,-9)">
@@ -857,8 +913,10 @@ function GraphCanvas({ scenario, step }) {
           );
         })}
         {/* edge labels (top layer, so nodes never paint over them) */}
-        {edgeInfo.map(({ i, on, ret, g, lbl, helpTerm }) => {
+        {edgeInfo.map(({ e, i, on, ret, g, lbl, helpTerm }) => {
           if (!lbl) return null;
+          if (e.hideWhenInactive && !on) return null;
+          if (e.spotlight) return null;
           if (helpTerm) {
             return (
               <foreignObject key={"l" + i} x={g.lx - 55} y={g.ly - 12} width={110} height={22} style={{ overflow: "visible" }}>
@@ -1018,7 +1076,6 @@ function SideRail({ scenario, step, setStep }) {
       </div>
       <div className="rail-narrator">
         <div>
-          <div className="rail-section-label">Step {step + 1}</div>
           <div className="rail-narration" dangerouslySetInnerHTML={{ __html: s.narration }} />
         </div>
         <div>
