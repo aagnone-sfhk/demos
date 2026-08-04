@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+#
+# Deploy a workspace app in apps/<name> to Heroku via CNB.
+#
+# Uses `pnpm deploy` to produce a self-contained artifact with all
+# workspace: protocols resolved, then pushes that artifact as a
+# throwaway git repo to the Heroku remote.
+#
+# Usage:
+#   scripts/deploy-heroku.sh <app-name> [heroku-app-name] [--build-only]
+#
+# Examples:
+#   scripts/deploy-heroku.sh headless-360-mcp
+#   scripts/deploy-heroku.sh headless-360-mcp my-heroku-app-name
+#   scripts/deploy-heroku.sh headless-360-mcp --build-only
+#
+# Heroku app resolution order:
+#   1. Second positional arg
+#   2. apps/<app-name>/.heroku-app file (single line, app name)
+#   3. HEROKU_APP env var
+#
+# Requirements: pnpm, git, heroku CLI (only for push; skipped with --build-only)
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+BUILD_ONLY=false
+APP_NAME=""
+HEROKU_APP=""
+for arg in "$@"; do
+  case "$arg" in
+    --build-only) BUILD_ONLY=true ;;
+    -*)           echo "error: unknown flag $arg" >&2; exit 1 ;;
+    *)
+      if [[ -z "$APP_NAME" ]]; then
+        APP_NAME="$arg"
+      elif [[ -z "$HEROKU_APP" ]]; then
+        HEROKU_APP="$arg"
+      else
+        echo "error: unexpected extra arg: $arg" >&2
+        exit 1
+      fi
+      ;;
+  esac
+done
+
+if [[ -z "$APP_NAME" ]]; then
+  echo "error: app name required" >&2
+  echo "usage: scripts/deploy-heroku.sh <app-name> [heroku-app-name] [--build-only]" >&2
+  exit 1
+fi
+
+APP_DIR="apps/$APP_NAME"
+if [[ ! -d "$APP_DIR" ]]; then
+  echo "error: $APP_DIR not found" >&2
+  exit 1
+fi
+
+if ! $BUILD_ONLY; then
+  if [[ -z "$HEROKU_APP" && -f "$APP_DIR/.heroku-app" ]]; then
+    HEROKU_APP="$(head -n1 "$APP_DIR/.heroku-app" | tr -d '[:space:]')"
+  fi
+  if [[ -z "$HEROKU_APP" && -n "${HEROKU_APP_ENV:-}" ]]; then
+    HEROKU_APP="$HEROKU_APP_ENV"
+  fi
+  if [[ -z "$HEROKU_APP" ]]; then
+    echo "error: heroku app name not resolved" >&2
+    echo "  provide it as arg 2, in $APP_DIR/.heroku-app, or via HEROKU_APP_ENV" >&2
+    exit 1
+  fi
+fi
+
+DEPLOY_DIR="deploy/$APP_NAME"
+
+echo "==> cleaning $DEPLOY_DIR"
+rm -rf "$DEPLOY_DIR"
+mkdir -p "$(dirname "$DEPLOY_DIR")"
+
+echo "==> pnpm deploy --filter $APP_NAME -> $DEPLOY_DIR"
+# --legacy: pnpm 10 requires either injected workspace packages or this flag.
+# Safe for apps without workspace: deps; still works if you add them later.
+pnpm --filter "$APP_NAME" deploy --legacy "$DEPLOY_DIR"
+
+if [[ ! -f "$DEPLOY_DIR/package.json" ]]; then
+  echo "error: pnpm deploy did not produce $DEPLOY_DIR/package.json" >&2
+  exit 1
+fi
+
+if $BUILD_ONLY; then
+  echo "==> build-only: artifact ready at $DEPLOY_DIR"
+  exit 0
+fi
+
+echo "==> initializing throwaway git repo in $DEPLOY_DIR"
+(
+  cd "$DEPLOY_DIR"
+  git init -q -b main
+  git add -A
+  git -c user.email=deploy@local -c user.name=deploy \
+    commit -q -m "deploy $APP_NAME @ $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  HEROKU_GIT_URL="https://git.heroku.com/${HEROKU_APP}.git"
+  echo "==> pushing to $HEROKU_GIT_URL (force)"
+  git remote add heroku "$HEROKU_GIT_URL"
+  git push --force heroku main
+)
+
+echo "==> deployed $APP_NAME to $HEROKU_APP"
