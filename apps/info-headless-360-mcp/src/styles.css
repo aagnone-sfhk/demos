@@ -1,0 +1,205 @@
+/* ---------- DESIGN TOKENS ----------
+   Every color the diagram uses is a variable here. Retheme the whole
+   thing by editing this block — nothing downstream hardcodes a hex.
+   The default palette is a calm blue "enterprise" look; swap the accents
+   for your brand and the nodes, edges, pulses, and chips all follow. */
+:root {
+  --navy: #032D60;      /* deepest brand color — topbar, headings */
+  --navy-2: #01214a;
+  --blue: #0176D3;      /* primary accent — active edges/nodes, arrowheads */
+  --blue-lt: #57a3f3;
+  --sky: #e8f3ff;       /* pale accent tint — chips, nav hovers */
+  --ink: #0b1b33;       /* body text */
+  --slate: #5c6b82;     /* secondary text, inactive edges */
+  --line: #d6e2f2;      /* borders, inactive strokes */
+  --panel: #ffffff;
+  --canvas: #f4f8fe;    /* diagram background */
+  --bg: #eef4fb;        /* page background */
+  --good: #2e844a;      /* return/success edges */
+  --warn: #a86403;
+  --danger: #ba0517;    /* context-window-full alert */
+  --sec: #7526e3;       /* secondary accent — a distinct node/edge role */
+  --shadow: 0 1px 3px rgba(3,45,96,.12), 0 6px 24px rgba(3,45,96,.10);
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; }
+#root { height: 100vh; }
+
+/* ---------- Layout ---------- */
+.app { display: grid; grid-template-rows: 46px 1fr; height: 100vh; }
+.topbar { display: flex; align-items: center; gap: 16px; padding: 0 20px;
+  background: linear-gradient(90deg, var(--navy) 0%, var(--navy-2) 60%, var(--blue) 160%);
+  color: #fff; box-shadow: var(--shadow); z-index: 20; height: 46px; }
+.brandlogos { display: flex; align-items: center; gap: 7px; background: #fff; border-radius: 10px; padding: 5px 9px; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.lockup { display: flex; flex-direction: column; justify-content: center; line-height: 1.2; }
+.lockup .title { font-weight: 700; font-size: 15px; letter-spacing: .2px; }
+.lockup .from { opacity: .82; font-weight: 400; font-size: 11.5px; }
+.topbar .spacer { flex: 1; }
+.badge-chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.35);
+  background: #0176D3; color: #fff; border-radius: 999px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; }
+a.badge-chip { text-decoration: none; transition: background .15s ease, border-color .15s ease, box-shadow .15s ease; }
+a.badge-chip:hover { background: #014486; border-color: rgba(255,255,255,.6); box-shadow: 0 2px 8px rgba(1,118,211,.45); }
+.badge-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: #cfe6ff; box-shadow: 0 0 0 3px rgba(207,230,255,.35); }
+.badge-chip .ext-icon { width: 12px; height: 12px; opacity: .95; }
+
+.body { display: grid; grid-template-columns: 268px 1fr; min-height: 0; }
+
+/* ---------- Side rail (scenario switcher + legend) ---------- */
+.rail { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; padding: 0; }
+.rail-steps { flex: none; padding: 10px 12px 10px; border-bottom: 1px solid var(--line); }
+.rail-step-dots { display: flex; gap: 4px; }
+.rail-step-dot { flex: 1; height: 10px; border-radius: 4px; background: var(--line); cursor: pointer; transition: background .15s; }
+.rail-step-dot.done { background: var(--blue-lt); }
+.rail-step-dot.active { background: var(--blue); }
+.rail-narrator { flex: 1; overflow-y: auto; padding: 14px 12px 16px; display: flex; flex-direction: column; gap: 18px; }
+.rail-section-label { font-size: 10px; font-weight: 800; color: var(--blue); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 4px; }
+.rail-narration { font-size: 13px; line-height: 1.55; color: var(--ink); }
+.rail-hood-body { font-size: 12px; line-height: 1.5; color: var(--slate); }
+.rail-nav { flex: none; display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
+.rail-nav .btn { flex: 1; text-align: center; padding: 7px 4px; font-size: 12px; }
+
+/* ---------- Main scene ---------- */
+.main { overflow: hidden; padding: 10px 14px 10px; min-width: 0; display: flex; flex-direction: column; }
+.main .canvas-wrap { flex: 1; min-height: 0; height: 100%; }
+.main .canvas-svg { width: 100%; height: 100%; }
+.scene-head { margin-bottom: 6px; flex: none; }
+.scene-head .eyebrow { font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
+.scene-head h1 { font-size: 18px; margin: 2px 0 0; color: var(--navy); }
+.scene-head .headline { display: none; }
+
+/* ---------- Graph canvas ----------
+   Edges are SVG paths. Their look is driven entirely by class:
+     .edge            inactive (grey, thin)
+     .edge.active     lit for the current step (accent, thick)
+     .edge.active.flow  + marching-ants animation (the "traffic is moving" cue)
+     .edge.ret        a return/response edge (dashed, drops to a baseline lane)
+   The @keyframes flow drift is the single most important animation here —
+   it's what makes a lit edge read as *live data moving*, not just highlighted. */
+.canvas-wrap { background: var(--canvas); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+.canvas-svg { display: block; width: 100%; height: auto; }
+.edge { fill: none; stroke: #c2d2e8; stroke-width: 2; transition: stroke .3s, stroke-width .3s; }
+.edge.active { stroke: var(--blue); stroke-width: 3; }
+.edge.active.flow { stroke-dasharray: 7 7; animation: flow 700ms linear infinite; }
+.edge.ret { stroke-dasharray: 3 5; }
+.edge.ret.active { stroke: var(--good); }
+@keyframes flow { to { stroke-dashoffset: 14; } }
+/* Spotlight — a narrow translucent wedge from a tool to the corpus card
+   it is currently scanning. The polygon's `points` are animated via SMIL
+   to sweep through every corpus card in turn (see the render code); this
+   reads as "reading each item, one at a time" rather than "loading them
+   all at once". No CSS animation here on purpose — the SMIL sweep is
+   already the motion. */
+/* Plain edge label rendered as an opaque pill (see edge-label-pill JSX) so
+   it stays legible near a card; --canvas backing + halo hide any close call. */
+.edge-label-pill { font-size: 10px; color: var(--slate); font-weight: 700; letter-spacing: .3px;
+  background: var(--canvas); box-shadow: 0 0 0 3px var(--canvas); border-radius: 4px;
+  white-space: nowrap; transition: color .3s; }
+.edge-label-pill.active { color: var(--blue); }
+.edge-label-pill.ret.active { color: var(--good); }
+.edge-label { font-size: 10px; fill: var(--slate); font-weight: 700; letter-spacing: .3px;
+  paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
+.edge-label.active { fill: var(--blue); }
+.edge-label.ret.active { fill: var(--good); }
+.edge-label-chip { font-size: 10px; }
+.edge-label-chip .help-chip { background: var(--canvas); box-shadow: 0 0 0 4px var(--canvas); }
+.edge-label-chip.active .help-chip { background: var(--sky); box-shadow: 0 0 0 4px var(--canvas); color: var(--blue); }
+
+/* ---------- Node card (rendered via SVG foreignObject) ----------
+   Nodes are real HTML divs placed at SVG coordinates. This is the trick
+   that lets a node be a proper flexbox card — logo + wrapping text +
+   shadow — instead of a rigid SVG <rect>+<text>. Active nodes pulse; the
+   inactive ones dim so the eye tracks the current step. */
+.node-slot { width: 100%; height: 100%; display: flex; align-items: center; }
+.node { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 9px; padding: 12px 11px;
+  background: #fff; border: 1.5px solid var(--line); border-radius: 12px; box-shadow: 0 1px 2px rgba(3,45,96,.08);
+  transition: border-color .3s, box-shadow .3s, opacity .3s; overflow: visible; }
+.node.dim { opacity: .4; }
+.node.active { border-color: var(--blue); border-width: 2px; animation: nodepulse 1.9s ease-in-out infinite; }
+.node.sec { border-color: var(--sec); }
+.node.sec.active { border-color: var(--sec); animation: secpulse 1.9s ease-in-out infinite; }
+@keyframes nodepulse { 0%,100%{ box-shadow: 0 0 0 3px rgba(1,118,211,.16);} 50%{ box-shadow: 0 0 0 8px rgba(1,118,211,.04);} }
+@keyframes secpulse { 0%,100%{ box-shadow: 0 0 0 3px rgba(117,38,227,.16);} 50%{ box-shadow: 0 0 0 8px rgba(117,38,227,.04);} }
+.node .nlogo { flex: none; width: 28px; height: 28px; display: grid; place-items: center; }
+.node .nemoji { font-size: 20px; line-height: 1; }
+.node .ntext { min-width: 0; flex: 1; }
+.node .ntype { font-size: 8px; text-transform: uppercase; letter-spacing: .5px; font-weight: 800; line-height: 1.1; }
+.node .nlabel { font-size: 11px; font-weight: 700; color: var(--ink); line-height: 1.2; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node .nsub { font-size: 9px; color: var(--slate); line-height: 1.12; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Per-type accent color for the little TYPE eyebrow on each card. */
+.n-agent { color: var(--blue); } .n-broker { color: var(--sec); } .n-mcp { color: #0a8a6f; }
+.n-llm { color: #b7791f; } .n-gateway { color: #c2410c; } .n-human { color: #2563eb; } .n-system { color: var(--slate); } .n-resource { color: var(--slate); }
+.node .zt { position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); background: var(--sec); color: #fff; font-size: 8px; font-weight: 800;
+  padding: 2px 7px; border-radius: 999px; letter-spacing: .3px; box-shadow: 0 1px 3px rgba(117,38,227,.4); white-space: nowrap; }
+
+/* ---------- Step narrator ---------- */
+.controls { display: flex; align-items: center; gap: 8px; margin: 8px 0 6px; }
+.btn { border: 1px solid var(--line); background: #fff; color: var(--navy); border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font); transition: all .12s; }
+.btn:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+.btn.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+.btn.primary:hover:not(:disabled) { background: #0161b3; color: #fff; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.steppips { display: flex; gap: 6px; margin-left: 6px; }
+.steppips .pip { width: 26px; height: 5px; border-radius: 3px; background: var(--line); cursor: pointer; transition: background .2s; }
+.steppips .pip.done { background: var(--blue-lt); }
+.steppips .pip.active { background: var(--blue); }
+.stepcount { font-size: 12.5px; color: var(--slate); margin-left: auto; }
+
+.narrator { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; box-shadow: var(--shadow); }
+.narrator .step-n { font-size: 10px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: .6px; }
+.narrator .narration { font-size: 13px; line-height: 1.45; margin: 3px 0 0; color: var(--ink); }
+.hood { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.hood summary { cursor: pointer; font-size: 11.5px; font-weight: 700; color: var(--slate); list-style: none; display: flex; align-items: center; gap: 6px; }
+.hood summary::-webkit-details-marker { display: none; }
+.hood summary .chev { transition: transform .15s; }
+.hood[open] summary .chev { transform: rotate(90deg); }
+.hood .hood-body { font-size: 13px; line-height: 1.55; color: var(--slate); margin-top: 8px; }
+code { background: var(--sky); color: var(--navy); padding: 1px 5px; border-radius: 4px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.note { margin-top: 12px; background: #faf6ff; border: 1px solid #e6d8fb; border-radius: 9px; padding: 10px 12px; font-size: 12.5px; color: var(--sec); font-weight: 600; line-height: 1.5; }
+
+/* ---------- Review mode (contact sheet) ----------
+   Reached via ?review in the URL. Renders EVERY step as a static canvas
+   stacked vertically — no controls, no animation — so one screenshot
+   captures the whole walkthrough. This is what makes an automated visual
+   self-review possible (see scripts/review.sh): a JSX transform can't see a
+   label overlapping a card, but a rendered contact sheet can. The canvas
+   keeps the SAME width as the live view on purpose — edge labels are a fixed
+   10px while cards scale with width, so a wider render would hide overlaps
+   that appear in the real diagram. Faithful width = faithful review. */
+.app.review { display: block; height: auto; }        /* free the fixed-height grid so the sheet grows */
+.app.review .main { overflow: visible; height: auto; }
+.review-step { margin: 6px 0 24px; }
+.review-cap { font-size: 12.5px; font-weight: 700; color: var(--navy); margin: 2px 2px 7px; line-height: 1.4; }
+.review-cap .rn { color: var(--blue); text-transform: uppercase; letter-spacing: .5px; margin-right: 6px; }
+.review-cap .help-chip { font-weight: 700; }
+/* Geometry-linter banner atop the review contact sheet. */
+.lint-banner { margin: 8px 2px 18px; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; line-height: 1.5; }
+.lint-banner.ok { background: #e7f6ee; color: #0a6b46; border: 1px solid #b7e3ca; }
+.lint-banner.bad { background: #fdecec; color: #a12020; border: 1px solid #f2c0c0; }
+.lint-banner ul { margin: 6px 0 0; padding-left: 20px; }
+.lint-banner li { margin: 2px 0; }
+.lint-banner code { background: rgba(0,0,0,.06); padding: 0 4px; border-radius: 3px; font-size: 11.5px; }
+
+/* ---------- Help bubbles (glossary chips) ----------
+   A chip can sit inside an SVG <foreignObject> (node/edge labels). Nesting
+   each chip's own popup inside that foreignObject is a browser trap: Chrome
+   computes a descendant's `position: fixed` against the SVG's internal
+   coordinate space once a foreignObject ancestor is in the chain, so the
+   popup renders back *inside* the diagram instead of escaping to open
+   screen space. Fix: chips are inert triggers only (a span + data-term, no
+   nested popup). ONE shared <HelpOverlay> is rendered at the App root — a
+   sibling of the diagram, never a foreignObject descendant — and a single
+   document-level hover/focus listener shows/hides it. Only ever one popup
+   on screen, so two chips can never fight for the same spot. */
+.help-chip { display:inline-flex; align-items:center; gap:4px; background: var(--sky); color: var(--navy); font-weight:700;
+  padding: 1px 7px 1px 8px; border-radius: 999px; cursor: help; font-size: inherit; }
+.help-chip .qm { width:13px; height:13px; border-radius:50%; background: var(--blue); color:#fff; font-size:8.5px; font-weight:800; display:grid; place-items:center; flex:none; }
+
+.help-overlay { position: fixed; top: 74px; right: 26px; width: 360px; max-width: calc(100vw - 52px);
+  background: var(--navy); color:#fff; font-size: 14px; font-weight:400; line-height:1.55; padding: 18px 20px 20px; border-radius: 18px;
+  box-shadow: 0 14px 38px rgba(3,45,96,.45); opacity:0; pointer-events:none; transition: opacity .15s, transform .15s;
+  transform: translateY(-6px) scale(.97); z-index: 100; }
+.help-overlay.show { opacity:1; transform: translateY(0) scale(1); }
+.help-overlay .ho-term { display:block; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--blue-lt); margin-bottom: 6px; }
+.help-overlay .ho-body { display:block; }
