@@ -147,7 +147,7 @@ export const SCENARIO_COPY: Record<string, ScenarioCopy> = {
       // 7 — the verdict
       {
         narration: `Before either agent has done a single thing — Standard MCP has already consumed nearly the entire context window just loading tool definitions. <b>Headless 360 starts at near zero.</b> Same 2,000+ actions. One approach scales.`,
-        hood: "Context window capacity consumed by tool schemas is capacity unavailable for reasoning, memory, and output. At 2,000+ tools, Standard MCP doesn't leave room to think. Headless 360 loads only what's asked for — one spec at a time — so the agent's working memory stays available for actual work.",
+        hood: "Context window capacity consumed by tool schemas is <b>capacity unavailable for agent reasoning</b>. At 2,000+ tools, Standard MCP doesn't leave room to think. Headless 360 loads only what's asked for, one spec at a time, so the agent's working memory stays available for valuable work.",
         nodeOverrides: {
           "c-agent": { sub: "Usage: heavy" },
           "h-agent": { sub: "Usage: light" },
