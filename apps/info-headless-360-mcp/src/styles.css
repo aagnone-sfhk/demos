@@ -63,6 +63,10 @@ a.badge-chip:hover { background: #014486; border-color: rgba(255,255,255,.6); bo
 /* ---------- Main scene ---------- */
 .main { overflow: hidden; padding: 10px 14px 10px; min-width: 0; display: flex; flex-direction: column; }
 .main .canvas-wrap { flex: 1; min-height: 0; height: 100%; }
+/* The SVG scales uniformly (preserveAspectRatio meet) and centers itself inside
+   the wrap, so the diagram never stretches. The colored rects span their true
+   viewBox bounds, so each region label stays centered in its own region; any
+   leftover space is just neutral wrap background. No overscan, no JS measuring. */
 .main .canvas-svg { width: 100%; height: 100%; }
 .scene-head { margin-bottom: 6px; flex: none; }
 .scene-head .eyebrow { font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }

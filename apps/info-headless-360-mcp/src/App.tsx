@@ -89,17 +89,6 @@ interface EdgeInfo {
   mk: string;
 }
 
-// Uniform "meet" scaling leaves a letterbox band top+bottom whenever the
-// rendered card's aspect ratio differs from the viewBox's (1400/830). The band
-// size (in viewBox units) depends on the container's live dimensions, so a
-// fixed pixel bleed would break at some sizes. Instead we bleed the OUTER
-// background edges by a full viewBox-height each way: content mapped outside
-// the viewBox still paints into the letterbox and is clipped by the SVG
-// viewport + `.canvas-wrap` overflow:hidden, so over-bleeding is free and
-// covers the band at any container aspect ratio. Geometry (nodes/edges/interior
-// lane seam) is untouched — no stretch.
-const OVERSCAN = CH;
-
 function GraphCanvas({ scenario, step }: { scenario: Scenario; step: number }) {
   const active = scenario.steps[step];
   const byId = useMemo(
@@ -122,29 +111,21 @@ function GraphCanvas({ scenario, step }: { scenario: Scenario; step: number }) {
 
   return (
     <div className="canvas-wrap">
-      <svg className="canvas-svg" viewBox={`0 0 ${CW} ${CH}`} role="img" aria-label={scenario.title + " diagram"}>
-        {/* swim-lane backgrounds — stop at CORPUS_X so corpus column is neutral.
-            The outer edges bleed past the viewBox by OVERSCAN so the colored
-            fields reach into the letterbox band that uniform (meet) scaling
-            leaves top/bottom when the card's aspect ratio differs from the
-            viewBox's. Content outside the viewBox still paints; `.canvas-wrap`
-            (overflow:hidden) clips the excess. Nodes/edges stay put — no
-            stretch. */}
+      <svg className="canvas-svg" viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={scenario.title + " diagram"}>
+        {/* Swim-lane + corpus backgrounds. The SVG keeps its native aspect ratio
+            (the .canvas-wrap is locked to CW/CH in CSS), so uniform scaling never
+            letterboxes: every rect below spans its exact viewBox bounds and each
+            label centres in its own true rect via flexbox — no overscan, no
+            measured re-centering. */}
         {(scenario.lanes || []).map((ln, i) => {
           const LABEL_W = 82;
-          const laneH = ln.y2 - ln.y1;              // true lane height (for the centered label)
-          const first = i === 0;
-          const last = i === (scenario.lanes!.length - 1);
-          const yTop = first ? -OVERSCAN : ln.y1;   // only outer edges bleed; interior seams stay exact
-          const yBot = last ? CH + OVERSCAN : ln.y2;
-          const fillH = yBot - yTop;
+          const laneH = ln.y2 - ln.y1;
           return (
             <g key={"ln" + i}>
               {/* tinted field (only up to corpus column) */}
-              <rect x={LABEL_W} y={yTop} width={CORPUS_X - LABEL_W} height={fillH} fill={ln.fill} />
-              {/* label strip — bleeds left past the viewBox so it fills the
-                  pillarbox band when the container is wider than the viewBox */}
-              <rect x={-OVERSCAN} y={yTop} width={LABEL_W + OVERSCAN} height={fillH} fill={ln.color ? ln.color.replace(/[\d.]+\)$/, "0.15)") : "rgba(0,0,0,.08)"} />
+              <rect x={LABEL_W} y={ln.y1} width={CORPUS_X - LABEL_W} height={laneH} fill={ln.fill} />
+              {/* label strip */}
+              <rect x={0} y={ln.y1} width={LABEL_W} height={laneH} fill={ln.color ? ln.color.replace(/[\d.]+\)$/, "0.15)") : "rgba(0,0,0,.08)"} />
               <foreignObject x={0} y={ln.y1} width={LABEL_W} height={laneH}>
                 <div style={{
                   width: LABEL_W + "px", height: laneH + "px",
@@ -168,20 +149,15 @@ function GraphCanvas({ scenario, step }: { scenario: Scenario; step: number }) {
         {(() => {
           const CORP_W = CW - CORPUS_X;
           const HDR_H = 32;
-          // Bleed the corpus right edge past the viewBox so it fills the right
-          // pillarbox band (wide containers); top/bottom bleed fills the
-          // letterbox band (tall containers). The header label + separators
-          // stay on their true coordinates.
-          const CORP_FILL_W = CORP_W + OVERSCAN;
           return (<g>
-            {/* Body fill below header — bleeds past bottom + right edges. */}
-            <rect x={CORPUS_X} y={HDR_H} width={CORP_FILL_W} height={CH + OVERSCAN - HDR_H} fill="rgba(1,118,211,.05)" />
-            {/* Header strip across the top — bleeds up + right. */}
-            <rect x={CORPUS_X} y={-OVERSCAN} width={CORP_FILL_W} height={HDR_H + OVERSCAN} fill="rgba(1,118,211,.15)" />
+            {/* Body fill below header */}
+            <rect x={CORPUS_X} y={HDR_H} width={CORP_W} height={CH - HDR_H} fill="rgba(1,118,211,.05)" />
+            {/* Header strip across the top */}
+            <rect x={CORPUS_X} y={0} width={CORP_W} height={HDR_H} fill="rgba(1,118,211,.15)" />
             {/* Bottom edge of header strip */}
             <line x1={CORPUS_X} y1={HDR_H} x2={CW} y2={HDR_H} stroke="rgba(1,118,211,.20)" strokeWidth="1" />
             {/* Left separator */}
-            <line x1={CORPUS_X} y1={-OVERSCAN} x2={CORPUS_X} y2={CH + OVERSCAN} stroke="rgba(1,118,211,.25)" strokeWidth="1" />
+            <line x1={CORPUS_X} y1={0} x2={CORPUS_X} y2={CH} stroke="rgba(1,118,211,.25)" strokeWidth="1" />
             <foreignObject x={CORPUS_X} y={0} width={CORP_W} height={HDR_H}>
               <div style={{ width: CORP_W+"px", height: HDR_H+"px", display:"flex", alignItems:"center", justifyContent:"center", boxSizing:"border-box" }}>
                 <span style={{ fontSize:"12px", fontWeight:800, letterSpacing:"0.8px", color:"rgba(1,118,211,.80)", fontFamily:"var(--font)", textTransform:"uppercase" }}>Salesforce Resources</span>
@@ -395,7 +371,7 @@ function TopBar() {
       </div>
       <div className="lockup">
         <span className="title">Headless 360 MCP Server</span>
-        <span className="from">Context-efficient Agent Tool Usage</span>
+        <span className="from">Efficient Context Management → Agent Quality</span>
       </div>
       <div className="spacer" />
       <a
@@ -406,7 +382,7 @@ function TopBar() {
         title="Announcing the Headless 360 MCP Server Beta"
       >
         <span className="dot" />
-        Developers Blog
+        Developer Blog
         <svg className="ext-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M14 4h6v6" />
           <path d="M10 14 20 4" />
