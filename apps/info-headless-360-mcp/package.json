@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "description": "Walkthrough of Salesforce's Headless 360 MCP Server, built with React + Vite.",
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
