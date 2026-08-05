@@ -6,6 +6,11 @@
 # workspace: protocols resolved, then pushes that artifact as a
 # throwaway git repo to the Heroku remote.
 #
+# Invoke via `pnpm deploy:heroku <app>`. (Named deploy:heroku, not deploy, so it
+# doesn't collide with the pnpm built-in `deploy` it calls internally.) This is
+# the recommended deploy path; scripts/deploy-subtree.sh is the alternative.
+# See docs/deploying.md for details.
+#
 # Usage:
 #   scripts/deploy-heroku.sh <app-name> [heroku-app-name] [--build-only]
 #
