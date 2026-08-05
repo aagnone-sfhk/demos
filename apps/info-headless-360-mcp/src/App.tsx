@@ -222,6 +222,19 @@ function GraphCanvas({ scenario, step }: { scenario: Scenario; step: number }) {
             // 4-point wedge: narrow at Discover → card-height at the target
             return `${sx},${sy - 5} ${sx},${sy + 5} ${tx},${t2} ${tx},${t1}`;
           };
+          // Final (summary) step: the sweep is distracting once the walkthrough
+          // is just recapping, so freeze the beam static and pointed at
+          // createCase — the one resource the example actually invoked. Every
+          // other step keeps the animated back-and-forth scan.
+          const isFinalStep = step === scenario.steps.length - 1;
+          if (isFinalStep) {
+            const frozen = byId["corp-4"] ?? targets[0];
+            return (
+              <g key={"sp" + i} className="spotlight" style={{ pointerEvents: "none" }}>
+                <polygon points={frameFor(frozen)} fill="url(#spotlight-grad)" />
+              </g>
+            );
+          }
           const sweep = [...targets, ...[...targets].reverse().slice(1, -1)];
           const values = sweep.map(frameFor).join(";") + ";" + frameFor(sweep[0]);
           const dur = (targets.length * 0.6) + "s";
