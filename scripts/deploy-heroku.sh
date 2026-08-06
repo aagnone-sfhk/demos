@@ -101,6 +101,21 @@ if [[ ! -f "$DEPLOY_DIR/package.json" ]]; then
   exit 1
 fi
 
+# Copy the app's in-tree npm lockfile into the artifact. Without ANY lockfile,
+# Heroku's Node CNB detects no package manager, skips both dependency install
+# and any build script, AND (crucially) relaunches the previously cached image
+# instead of our freshly pushed source. Deploys report success, releases
+# increment, and the live site keeps serving stale bundles — a trap documented
+# in docs/deploying.md §2.1. Shipping the lockfile makes the buildpack respect
+# the new push.
+if [[ -f "$APP_DIR/package-lock.json" ]]; then
+  cp "$APP_DIR/package-lock.json" "$DEPLOY_DIR/package-lock.json"
+  echo "==> copied package-lock.json into artifact (prevents CNB stale-image trap)"
+else
+  echo "warn: $APP_DIR/package-lock.json missing — Heroku may serve a cached image" >&2
+  echo "      generate one with: pnpm deploy:lock $APP_NAME" >&2
+fi
+
 if $BUILD_ONLY; then
   echo "==> build-only: artifact ready at $DEPLOY_DIR"
   exit 0
