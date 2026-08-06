@@ -119,7 +119,8 @@ const SCENARIO_LAYOUT: LayoutScenario[] = [
     nodes: [
       // ── Classic lane ──────────────────────────────────────────────────────
       { id: "c-agent",       type: "agent",    x: 106,  y: 155, w: 204, h: 104, ctxFill: 0 },
-      { id: "c-server",      type: "mcp",      logo: "toolstack", x: 360,  y: 80  },
+      // Service cards widened so bumped title + long subtitle ("Returns entire catalog") fit without ellipsis.
+      { id: "c-server",      type: "mcp",      logo: "toolstack", x: 328,  y: 80, w: 224 },
 
       // ── Shared corpus (Salesforce Resources column) ───────────────────────
       // 9 cards × 72px step = 648; start y=(830-648)/2=91, step=72.
@@ -135,13 +136,13 @@ const SCENARIO_LAYOUT: LayoutScenario[] = [
       { id: "corp-x",        type: "resource", logo: "database",                x: 1088, y: 667, w: 212 },
 
       // ── Headless lane ─────────────────────────────────────────────────────
-      // Tool cards use w:212 too so "Dispatch Read-Only" isn't truncated.
+      // Tool cards use w:224 so bumped label font keeps "Dispatch Read-Only" un-truncated.
       { id: "h-agent",       type: "agent",    x: 106,  y: 570, w: 204, h: 104, ctxFill: 0 },
-      { id: "h-server",      type: "mcp",      logo: "sfcloud",                 x: 360,  y: 530 },
-      { id: "h-discover",    type: "resource", logo: "search",  helpTerm: "discover", x: 580, y: 460, w: 212 },
-      { id: "h-describe",    type: "resource",                  helpTerm: "describe", x: 580, y: 544, w: 212 },
-      { id: "h-dispatch",    type: "resource",                  helpTerm: "dispatch", x: 580, y: 628, w: 212 },
-      { id: "h-dispatch-ro", type: "resource",                  helpTerm: "dispatch", x: 580, y: 712, w: 212 },
+      { id: "h-server",      type: "mcp",      logo: "sfcloud",                 x: 328,  y: 530, w: 224 },
+      { id: "h-discover",    type: "resource", logo: "search",  helpTerm: "discover", x: 580, y: 460, w: 224 },
+      { id: "h-describe",    type: "resource",                  helpTerm: "describe", x: 580, y: 544, w: 224 },
+      { id: "h-dispatch",    type: "resource",                  helpTerm: "dispatch", x: 580, y: 628, w: 224 },
+      { id: "h-dispatch-ro", type: "resource",                  helpTerm: "dispatch", x: 580, y: 712, w: 224 },
     ],
     edges: [
       // ── Classic ───────────────────────────────────────────────────────────

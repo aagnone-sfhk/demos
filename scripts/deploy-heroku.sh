@@ -83,6 +83,14 @@ echo "==> cleaning $DEPLOY_DIR"
 rm -rf "$DEPLOY_DIR"
 mkdir -p "$(dirname "$DEPLOY_DIR")"
 
+# Build the app in-place BEFORE packaging. pnpm deploy copies the app dir into
+# $DEPLOY_DIR verbatim, including whatever dist/ is currently there. If we don't
+# refresh dist/ first we ship stale bundles — the CNB stack here has no lockfile
+# in the artifact, so Heroku won't (re)build for us. Do it locally, with pnpm,
+# so the deploy is deterministic and always matches the source we just wrote.
+echo "==> pnpm --filter $APP_NAME build (refresh dist/ before packaging)"
+pnpm --filter "$APP_NAME" build
+
 echo "==> pnpm deploy --filter $APP_NAME -> $DEPLOY_DIR"
 # --legacy: pnpm 10 requires either injected workspace packages or this flag.
 # Safe for apps without workspace: deps; still works if you add them later.

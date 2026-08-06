@@ -133,7 +133,7 @@ function GraphCanvas({ scenario, step }: { scenario: Scenario; step: number }) {
                   padding: "0 10px", boxSizing: "border-box",
                 }}>
                   <span style={{
-                    fontSize: "12px", fontWeight: 800, letterSpacing: "0.8px",
+                    fontSize: "13.5px", fontWeight: 800, letterSpacing: "0.8px",
                     color: ln.color || "rgba(0,0,0,.5)", fontFamily: "var(--font)",
                     textTransform: "uppercase", textAlign: "center", lineHeight: 1.4,
                     overflowWrap: "break-word", wordBreak: "normal",
@@ -160,7 +160,7 @@ function GraphCanvas({ scenario, step }: { scenario: Scenario; step: number }) {
             <line x1={CORPUS_X} y1={0} x2={CORPUS_X} y2={CH} stroke="rgba(1,118,211,.25)" strokeWidth="1" />
             <foreignObject x={CORPUS_X} y={0} width={CORP_W} height={HDR_H}>
               <div style={{ width: CORP_W+"px", height: HDR_H+"px", display:"flex", alignItems:"center", justifyContent:"center", boxSizing:"border-box" }}>
-                <span style={{ fontSize:"12px", fontWeight:800, letterSpacing:"0.8px", color:"rgba(1,118,211,.80)", fontFamily:"var(--font)", textTransform:"uppercase" }}>Salesforce Resources</span>
+                <span style={{ fontSize:"13.5px", fontWeight:800, letterSpacing:"0.8px", color:"rgba(1,118,211,.80)", fontFamily:"var(--font)", textTransform:"uppercase" }}>Salesforce Resources</span>
               </div>
             </foreignObject>
           </g>);
@@ -256,11 +256,11 @@ function GraphCanvas({ scenario, step }: { scenario: Scenario; step: number }) {
                   <div className="nlogo">{logo ? <Logo name={logo} size={nn.h ? 36 : 28} /> : <span className={"nemoji n-" + nn.type} style={nn.h ? { fontSize: "26px" } : undefined}>{ICON[nn.type]}</span>}</div>
                   <div className="ntext">
                     <div className={"ntype n-" + nn.type}>{TYPE_LABEL[nn.type]}</div>
-                    <div className="nlabel" style={nn.h ? { fontSize: "14px" } : undefined}>{nn.label}{nn.helpTerm ? <Help id={nn.helpTerm} compact /> : null}</div>
-                    {nn.sub ? <div className="nsub" style={nn.h ? { fontSize: "11px" } : undefined}>{nn.sub}</div> : null}
+                    <div className="nlabel" style={nn.h ? { fontSize: "16px" } : undefined}>{nn.label}{nn.helpTerm ? <Help id={nn.helpTerm} compact /> : null}</div>
+                    {nn.sub ? <div className="nsub" style={nn.h ? { fontSize: "12.5px" } : undefined}>{nn.sub}</div> : null}
                 {nn.ctxFill != null && (
                   <div style={{ marginTop: "6px" }}>
-                    <div style={{ fontSize: "7px", fontWeight: 800, letterSpacing: ".5px", textTransform: "uppercase", lineHeight: 1, marginBottom: "3px",
+                    <div style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: ".5px", textTransform: "uppercase", lineHeight: 1, marginBottom: "3px",
                       color: nn.ctxFill >= 0.85 ? "var(--danger)" : "var(--slate)" }}>
                       Context Window{nn.ctxFill >= 0.85 ? " — FLOODED" : ""}
                     </div>

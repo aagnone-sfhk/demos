@@ -30,11 +30,18 @@ Prerequisites: an authenticated Heroku CLI (`heroku whoami` should succeed).
 
 ## 1. `pnpm deploy:heroku` — self-contained artifact (recommended)
 
-`scripts/deploy-heroku.sh` runs the pnpm **built-in** `pnpm deploy --legacy` to
-produce a **self-contained artifact**: every `workspace:` protocol dependency is
-resolved and the app's own `node_modules` is materialized into `deploy/<app>/`.
-That directory is initialized as a throwaway git repo and force-pushed to the
-Heroku remote.
+`scripts/deploy-heroku.sh` first runs `pnpm --filter <app> build` in-place so
+the app's `dist/` is fresh, then invokes the pnpm **built-in** `pnpm deploy
+--legacy` to produce a **self-contained artifact**: every `workspace:` protocol
+dependency is resolved and the app's own `node_modules` (plus the just-built
+`dist/`) is materialized into `deploy/<app>/`. That directory is initialized as
+a throwaway git repo and force-pushed to the Heroku remote.
+
+> The prebuild is important: the artifact ships no lockfile, so Heroku's Node
+> CNB does not run `npm ci` or any `heroku-postbuild` script — it just launches
+> what it received. Any `dist/` that wasn't refreshed before packaging becomes
+> the served bundle. The script does the build for you; don't rely on Heroku
+> to rebuild.
 
 ```bash
 pnpm deploy:heroku info-headless-360-mcp                # resolve .heroku-app, build, push
