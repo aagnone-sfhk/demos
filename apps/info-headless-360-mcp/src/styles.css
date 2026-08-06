@@ -74,12 +74,17 @@ a.badge-chip:hover { background: #014486; border-color: rgba(255,255,255,.6); bo
 
 /* ---------- Main scene ---------- */
 .main { overflow: hidden; padding: 10px 14px 10px; min-width: 0; display: flex; flex-direction: column; }
-.main .canvas-wrap { flex: 1; min-height: 0; height: 100%; }
-/* The SVG scales uniformly (preserveAspectRatio meet) and centers itself inside
-   the wrap, so the diagram never stretches. The colored rects span their true
-   viewBox bounds, so each region label stays centered in its own region; any
-   leftover space is just neutral wrap background. No overscan, no JS measuring. */
-.main .canvas-svg { width: 100%; height: 100%; }
+/* .canvas-wrap is now a bare centering container — NO visual chrome. The
+   SVG itself carries the border/shadow/rounded-corner "card" look. This is
+   deliberate: previously the wrap was the visible card and the SVG letterboxed
+   inside it (preserveAspectRatio meet), so any layout change that shifted the
+   wrap's aspect (viewport width, sidebar width, topbar height, narrator length)
+   left the diagram floating inside a taller/wider wrap with visible background
+   above or below. Moving the card styling ONTO the SVG element eliminates the
+   mismatch structurally — a bug that can't recur, not a bug we keep fixing. */
+.main .canvas-wrap { flex: 1; min-height: 0; height: 100%; display: flex;
+  align-items: center; justify-content: center; }
+.main .canvas-svg { max-width: 100%; max-height: 100%; width: auto; height: auto; }
 .scene-head { margin-bottom: 6px; flex: none; }
 .scene-head .eyebrow { font-size: 12.5px; color: var(--blue); font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
 .scene-head h1 { font-size: 21px; margin: 2px 0 0; color: var(--navy); }
@@ -93,8 +98,11 @@ a.badge-chip:hover { background: #014486; border-color: rgba(255,255,255,.6); bo
      .edge.ret        a return/response edge (dashed, drops to a baseline lane)
    The @keyframes flow drift is the single most important animation here —
    it's what makes a lit edge read as *live data moving*, not just highlighted. */
-.canvas-wrap { background: var(--canvas); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
-.canvas-svg { display: block; width: 100%; height: auto; }
+.canvas-wrap { position: relative; }
+/* Card styling lives on the SVG itself — see the block above `.main .canvas-wrap`
+   for why. The SVG's aspect-ratio is set inline in App.tsx (matching CW/CH),
+   so max-* constraints size it to fit the wrap without any letterbox gap. */
+.canvas-svg { display: block; background: var(--canvas); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
 .edge { fill: none; stroke: #c2d2e8; stroke-width: 2; transition: stroke .3s, stroke-width .3s; }
 .edge.active { stroke: var(--blue); stroke-width: 3; }
 .edge.active.flow { stroke-dasharray: 7 7; animation: flow 700ms linear infinite; }

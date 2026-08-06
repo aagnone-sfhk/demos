@@ -111,7 +111,12 @@ function GraphCanvas({ scenario, step }: { scenario: Scenario; step: number }) {
 
   return (
     <div className="canvas-wrap">
-      <svg className="canvas-svg" viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={scenario.title + " diagram"}>
+      {/* aspectRatio matches the viewBox so the SVG element sizes to its own
+          content — no letterboxing possible. The wrap is a bare flex-centering
+          container. See styles.css `.canvas-wrap`/`.canvas-svg` comments. */}
+      <svg className="canvas-svg" viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="xMidYMid meet"
+           style={{ aspectRatio: `${CW} / ${CH}` }}
+           role="img" aria-label={scenario.title + " diagram"}>
         {/* Swim-lane + corpus backgrounds. The SVG keeps its native aspect ratio
             (the .canvas-wrap is locked to CW/CH in CSS), so uniform scaling never
             letterboxes: every rect below spans its exact viewBox bounds and each
