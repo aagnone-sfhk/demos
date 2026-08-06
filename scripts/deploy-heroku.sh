@@ -121,6 +121,22 @@ if $BUILD_ONLY; then
   exit 0
 fi
 
+# Purge the CNB build cache BEFORE the push. Observed on this stack: even with
+# the lockfile copied into the artifact, Heroku's CNB sometimes still relaunches
+# a cached image (or serves the previous dist) after a fresh push — the layer
+# content-hash logic matches too eagerly against cached layers. Purging first
+# means the incoming push builds against a clean cache, so the served bundle
+# deterministically matches what we just pushed. Costs ~3s. Skips silently if
+# the heroku-builds plugin isn't installed.
+if heroku plugins 2>/dev/null | grep -q heroku-builds; then
+  echo "==> purging CNB build cache before push (avoids stale-image reuse)"
+  heroku builds:cache:purge -a "$HEROKU_APP" --confirm "$HEROKU_APP" >/dev/null 2>&1 \
+    || echo "warn: cache purge failed (continuing)"
+else
+  echo "note: heroku-builds plugin not installed; skipping cache purge"
+  echo "      install with: heroku plugins:install heroku-builds"
+fi
+
 echo "==> initializing throwaway git repo in $DEPLOY_DIR"
 (
   cd "$DEPLOY_DIR"
@@ -134,20 +150,5 @@ echo "==> initializing throwaway git repo in $DEPLOY_DIR"
   git remote add heroku "$HEROKU_GIT_URL"
   git push --force heroku main
 )
-
-# Purge the CNB build cache. Observed on this stack: even with the lockfile
-# copied into the artifact, Heroku's CNB sometimes still relaunches a cached
-# image (or serves the previous dist) after a fresh push — presumably because
-# the layer content-hash logic matches too eagerly. Purging costs ~3s and makes
-# the served bundle deterministically match what we just pushed. Skips silently
-# if the heroku-builds plugin isn't installed.
-if heroku plugins 2>/dev/null | grep -q heroku-builds; then
-  echo "==> purging CNB build cache (avoids stale-image reuse)"
-  heroku builds:cache:purge -a "$HEROKU_APP" --confirm "$HEROKU_APP" >/dev/null 2>&1 \
-    || echo "warn: cache purge failed (continuing)"
-else
-  echo "note: heroku-builds plugin not installed; skipping cache purge"
-  echo "      install with: heroku plugins:install heroku-builds"
-fi
 
 echo "==> deployed $APP_NAME to $HEROKU_APP"
