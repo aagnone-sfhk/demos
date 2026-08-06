@@ -225,7 +225,7 @@ export interface Scenario extends LayoutScenario {
   title: string;
   headline: string;
   nodes: (LayoutNode & NodeCopy)[];
-  steps: (LayoutStep & { narration: string; hood: string })[];
+  steps: (LayoutStep & { narration: string; hood: string; analogy: string })[];
 }
 
 /* Merge editable copy (copy.ts → SCENARIO_COPY) into the structural layout
@@ -259,6 +259,7 @@ export const SCENARIOS: Scenario[] = SCENARIO_LAYOUT.map((s) => {
         ...st,
         narration: sc.narration ?? "",
         hood:      sc.hood      ?? "",
+        analogy:   sc.analogy   ?? "",
         nodeOverrides: _mergeOverrides(st.nodeOverrides, sc.nodeOverrides),
       };
     }),

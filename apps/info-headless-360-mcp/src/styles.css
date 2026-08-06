@@ -57,6 +57,18 @@ a.badge-chip:hover { background: #014486; border-color: rgba(255,255,255,.6); bo
 .rail-section-label { font-size: 10px; font-weight: 800; color: var(--blue); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 4px; }
 .rail-narration { font-size: 13px; line-height: 1.55; color: var(--ink); }
 .rail-hood-body { font-size: 12px; line-height: 1.5; color: var(--slate); }
+/* Analogy: a plain-English mental model. Visually distinct from Summary and
+   Under-the-hood — a soft blue-tinted card with an accent bar — so it reads
+   as a helpful aside, not more prose. */
+.rail-analogy-body {
+  font-size: 12.5px; line-height: 1.55; color: var(--ink);
+  background: rgba(1,118,211,.06);
+  border-left: 3px solid var(--blue);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-style: italic;
+}
+.rail-analogy-body b { font-style: normal; }
 .rail-nav { flex: none; display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
 .rail-nav .btn { flex: 1; text-align: center; padding: 7px 4px; font-size: 12px; }
 

@@ -13,8 +13,10 @@
        ├─ title        h1
        ├─ headline     intro prose (currently unrendered but kept for future use)
        ├─ nodes        { <nodeId>: { label, sub } }  — text on each card
-       └─ steps[]      per-step { narration, hood, nodeOverrides?: { <nodeId>: { sub } } }
-                       narration/hood: HTML ok, ${helpHTML("key")} chips ok
+       └─ steps[]      per-step { narration, hood, analogy, nodeOverrides?: { <nodeId>: { sub } } }
+                       narration/hood/analogy: HTML ok, ${helpHTML("key")} chips ok
+                       analogy is optional — a plain-English mental model
+                       to anchor the step; renders in its own sidebar section.
                        nodeOverrides.sub: change a card's subtitle for that step
 
    Any string may contain HTML tags and ${helpHTML("glossaryKey")} chips.
@@ -70,6 +72,7 @@ export interface NodeCopy {
 export interface StepCopy {
   narration?: string;
   hood?: string;
+  analogy?: string;
   nodeOverrides?: Record<string, NodeCopy>;
 }
 
@@ -123,6 +126,7 @@ export const SCENARIO_COPY: Record<string, ScenarioCopy> = {
       {
         narration: `The top agent connects to a <b>Standard MCP server</b>. The server dumps every resource's info (2,000+) into the agent's ${helpHTML("ctx")} upfront. The agent's attention is flooded before it has reasoned about anything.`,
         hood: "Standard MCP servers load the full schema of every resource upfront into the model's context window. The model then suffers from lost-in-the-middle syndrome for every interaction of the session as it tries to plan and execute tasks.",
+        analogy: "Imagine walking into a store and, before you can buy anything, being handed a catalog of <b>every single item on every shelf</b>. You have to read the whole thing yourself and figure out what you need. That's Standard MCP.",
       },
       // 3 — Headless 360 connects, gets 4 tools
       {
@@ -132,6 +136,7 @@ export const SCENARIO_COPY: Record<string, ScenarioCopy> = {
       {
         narration: `The ${helpHTML("discover")} tool queries an index of the Salesforce resources using natural language from the agent, returning a ranked shortlist. This keeps the agent focused and avoids bloating its attention.`,
         hood: "The agent's natural language search forms a contextual lookup of the relevant MCP resources needed for this part of the agent session. The extra upfront discovery step saves precious context window space (a worthy tradeoff).",
+        analogy: "Now imagine walking into that same store and asking the <b>attendant</b> — someone who fundamentally understands the store — for what you need. They walk you straight to the right shelf. That's Discover.",
       },
       // 5 — Describe fetches the OAS spec for createCase
       {

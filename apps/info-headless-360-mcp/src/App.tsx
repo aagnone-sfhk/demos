@@ -414,6 +414,12 @@ function SideRail({ scenario, step, setStep }: { scenario: Scenario; step: numbe
           <div className="rail-section-label">Summary</div>
           <div className="rail-narration" dangerouslySetInnerHTML={{ __html: s.narration }} />
         </div>
+        {s.analogy ? (
+          <div>
+            <div className="rail-section-label">Analogy</div>
+            <div className="rail-analogy-body" dangerouslySetInnerHTML={{ __html: s.analogy }} />
+          </div>
+        ) : null}
         {s.hood ? (
           <div>
             <div className="rail-section-label">Under the hood</div>
@@ -432,11 +438,18 @@ function SideRail({ scenario, step, setStep }: { scenario: Scenario; step: numbe
 export default function App() {
   const [active] = useState(SCENARIOS[0].id);
   const scenario = SCENARIOS.find((s) => s.id === active)!;
-  const [step, setStep] = useState(0);
   const total = scenario.steps.length;
+  // ?step=N deep-links to a specific frame (1-based, clamped). Enables direct
+  // links / screenshots of any step without clicking through from step 1.
+  const initialStep = (() => {
+    if (typeof location === "undefined") return 0;
+    const m = /[?&]step=(\d+)/.exec(location.search);
+    if (!m) return 0;
+    return Math.max(0, Math.min(total - 1, parseInt(m[1], 10) - 1));
+  })();
+  const [step, setStep] = useState(initialStep);
 
-  // Reset step when scenario changes
-  useEffect(() => { setStep(0); }, [active]);
+  useEffect(() => { setStep(initialStep); }, [active, initialStep]);
 
   // Keyboard nav: ← / → arrows
   useEffect(() => {
