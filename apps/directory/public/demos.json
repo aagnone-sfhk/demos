@@ -3,7 +3,7 @@
     "slug": "info-headless-360-mcp",
     "title": "Headless 360 MCP Server (React app)",
     "blurb": "Full React + Vite build of the Headless 360 MCP Server walkthrough — richer UI, TypeScript source, Heroku-deployable.",
-    "url": null,
+    "url": "https://info-headless-360-mcp-b4dc2a2ec0f4.aster-virginia.herokuapp.com/",
     "source": "https://github.com/aagnone/demos/tree/main/apps/info-headless-360-mcp",
     "tags": ["mcp", "agents"]
   }
